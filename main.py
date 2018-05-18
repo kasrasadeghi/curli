@@ -1,3 +1,4 @@
+#!/bin/python3
 """
 This is a curl replacement for interactive use.
 
@@ -8,25 +9,55 @@ Features:
 
 """
 
-import getpass
-import requests
 import os
 import json
 import re
+import pprint
 
-LOADPATH = '/home/kasra/projects/kurl/cache'
+import getpass
+import requests
+
+import json_table
+
+LOADPATH = '/home/kasra/projects/curli/cache'
+
+CACHE = ['URL', 'JSON']
 URL = ''
+JSON = ''
+
 AUTH = None
 
 
 def load():
+    global URL
+    global JSON
     if os.path.isfile(LOADPATH):
         with open(LOADPATH) as f:
             data = json.load(f)
     else:
         return f'load cache does not exist @ {loadpath}'
-    URL = data['URL']
-    return 'loaded cache'
+
+    success = []
+    
+    try:
+        URL = data['URL']
+        success += ['URL']
+    except:
+        pass
+
+    try:
+        JSON = data['JSON']
+        success += ['JSON']
+    except:
+        pass
+    
+    return 'loaded ' + ", ".join(success) + ' from cache'
+
+
+def save():
+    with open(LOADPATH, 'w+') as f:
+        json.dump({'URL': URL, 'JSON': JSON}, f)
+    return 'saved ' + ", ".join(CACHE)
 
 
 def auth():
@@ -37,53 +68,73 @@ def auth():
 
 
 def get(url):
+    global URL
+    global JSON
     if not URL:
         return 'error: set URL first'
     if not AUTH:
-        return requests.get(URL + rest, auth=AUTH).text
-    return requests.get(ULR + rest).text
+        JSON = requests.get(URL + url, auth=AUTH).json()
+    JSON = requests.get(URL + url).json()
+    return JSON
 
 
 def set_url(url):
-    if not re.find(r'://'):
-        url = 'https://' + url
-    URL = url
+    global URL
+    if not re.search(r'://', url):
+        URL = 'https://' + url
+    else:
+        URL = url
     return 'url set to ' + url
 
 
-def save():
-    with open(LOADPATH, 'w') as f:
-        json.dump(f, {'URL': URL})
-    return 'saved url'
+def before_space(string):
+    try:
+        key, rest = string.strip().split(' ', 1)
+        return key, rest
+    except ValueError:
+        return string.strip(), ''
 
 
 def evaluate(read):
     global URL
-    key, rest = read.strip().split(' ', 1)
-    if key == 'set':
-        return set_url(rest)
-    if key == 'get':
-        return get(rest)
-    if key == 'auth':
-        return auth()
-    if key == 'load':
-        return load()
-    if key == 'save':
-        return save()
+    key, rest = before_space(read)
+    try:
+        if key == 'set':
+            return set_url(rest)
+        if key == 'get':
+            return get(rest)
+        if key == 'auth':
+            return auth()
+        if key == 'load':
+            return load()
+        if key == 'save':
+            return save()
+
+        if key == 'table':
+            return tablify(JSON)
+
+        if key == 'url':
+            return URL
+        if key == 'json':
+            return JSON
+    except Exception as e:
+        print(e)
     
-    
+ 
 def repl():
     while True:
         try:
             read = input(' > ')
         except EOFError:
             print()
+            print(save())
             break
         response = evaluate(read)
         print(response)
 
-        
+
 def main():
+    print(load())
     repl()
 
     
